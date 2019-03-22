@@ -147,6 +147,33 @@
         };
       }
 
+      function handleAddTodo(name, callback) {
+        return (dispatch) => {
+          return API.saveTodo(name)
+            .then((todo) => {
+              //saveTodo is return a promise, and whatever is in the input field gets reset back
+              //saveTodo will return the new todo object from the DB, as it's getting generated via API then returned
+              dispatch(addTodoAction(todo));
+              callback()
+            })
+            .catch(() => {
+              alert("error try again");
+            });
+        }
+
+      }
+
+      function handleToggle(id) {
+        return (dispatch) => {
+          dispatch(toggleTodoAction(id))
+          return API.saveTodoToggle(id).catch(() => {
+            dispatch(toggleTodoAction(id));
+            alert("error");
+          });
+        }
+
+      }
+
       const checker = store => next => action => {
         if (
           action.type === ADD_TODO &&
@@ -263,19 +290,12 @@
       class Todos extends React.Component {
         addItem = e => {
           e.preventDefault();
+
+          this.props.store.dispatch(handleAddTodo(this.input.value, () => this.input.value = ''))
           // need to save and persist todo items after it's 'added', once we get confirmation - we'll display to UI
 
           //we're calling the saveToDo method from API, passing it the input (name) of the todo this.input.value
-          return API.saveTodo(this.input.value)
-            .then(todo => {
-              //saveTodo is return a promise, and whatever is in the input field gets reset back
-              //saveTodo will return the new todo object from the DB, as it's getting generated via API then returned
-              this.props.store.dispatch(addTodoAction(todo));
-              this.input.value = "";
-            })
-            .catch(() => {
-              alert("error try again");
-            });
+
         };
 
         // we need to remove the item from the DB first, then after response - remove from local
@@ -297,12 +317,7 @@
         };
 
         toggleItem = id => {
-          this.props.store.dispatch(toggleTodoAction(id));
-
-          return API.saveTodoToggle(id).catch(() => {
-            this.props.store.dispatch(toggleTodoAction(id));
-            alert("error");
-          });
+          this.props.store.dispatch(handleToggle(id));
         };
 
         render() {
