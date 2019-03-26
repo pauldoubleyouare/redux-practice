@@ -7,6 +7,7 @@
     <script src="https://unpkg.com/react-dom@16.3.0-alpha.1/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
     <script src="https://tylermcginnis.com/goals-todos-api/index.js"></script>
+    <script src='https://unpkg.com/redux-thunk@2.2.0/dist/redux-thunk.min.js'></script>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -126,10 +127,9 @@
       function handleDeleteGoal(goal) {
         return dispatch => {
           dispatch(removeGoalAction(goal.id));
-          return API.deleteGoal(goal.id)
-            .catch(() => {
-              dispatch(addGoalAction(goal));
-              alert("an error occurred - try again");
+          return API.deleteGoal(goal.id).catch(() => {
+            dispatch(addGoalAction(goal));
+            alert("an error occurred - try again");
           });
         };
       }
@@ -148,30 +148,41 @@
       }
 
       function handleAddTodo(name, callback) {
-        return (dispatch) => {
+        return dispatch => {
           return API.saveTodo(name)
-            .then((todo) => {
+            .then(todo => {
               //saveTodo is return a promise, and whatever is in the input field gets reset back
               //saveTodo will return the new todo object from the DB, as it's getting generated via API then returned
               dispatch(addTodoAction(todo));
-              callback()
+              callback();
             })
             .catch(() => {
               alert("error try again");
             });
-        }
-
+        };
       }
 
       function handleToggle(id) {
         return (dispatch) => {
-          dispatch(toggleTodoAction(id))
+          dispatch(toggleTodoAction(id));
           return API.saveTodoToggle(id).catch(() => {
             dispatch(toggleTodoAction(id));
             alert("error");
           });
-        }
+        };
+      }
 
+      function handleInitialData() {
+        return (dispatch) => {
+          return Promise.all([
+            API.fetchTodos(),
+            API.fetchGoals()
+          ]).then(
+            ([todos, goals]) => {
+              dispatch(receiveDataAction(todos, goals));
+            }
+          );
+        };
       }
 
       const checker = store => next => action => {
@@ -199,14 +210,6 @@
         console.log("The new state: ", store.getState());
         console.groupEnd();
         return result;
-      };
-
-      const thunk = store => next => action => {
-        if (typeof action === "function") {
-          return action(store.dispatch);
-        }
-
-        return next(action);
       };
 
       // ===== Reducer function =====
@@ -262,7 +265,7 @@
           goals,
           loading
         }),
-        Redux.applyMiddleware(thunk, checker, logger)
+        Redux.applyMiddleware(ReduxThunk.default, checker, logger)
       );
     </script>
 
@@ -291,11 +294,12 @@
         addItem = e => {
           e.preventDefault();
 
-          this.props.store.dispatch(handleAddTodo(this.input.value, () => this.input.value = ''))
+          this.props.store.dispatch(
+            handleAddTodo(this.input.value, () => (this.input.value = ""))
+          );
           // need to save and persist todo items after it's 'added', once we get confirmation - we'll display to UI
 
           //we're calling the saveToDo method from API, passing it the input (name) of the todo this.input.value
-
         };
 
         // we need to remove the item from the DB first, then after response - remove from local
@@ -374,12 +378,7 @@
         componentDidMount() {
           const { store } = this.props;
 
-          Promise.all([API.fetchTodos(), API.fetchGoals()]).then(
-            ([todos, goals]) => {
-              store.dispatch(receiveDataAction(todos, goals));
-            }
-          );
-
+          store.dispatch(handleInitialData());
           store.subscribe(() => this.forceUpdate());
         }
         render() {
